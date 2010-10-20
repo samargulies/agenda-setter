@@ -1,0 +1,30 @@
+.as_event_date {
+border: 1px solid #ddd;
+float: left;
+margin-right: 5px;
+margin-top: 2px;
+width: 30px;
+font-family:  Arial, sans-serif;
+}
+.as_event_date .as_month {
+background: #D33;
+color: white;
+display: block;
+font-size: 10px;
+letter-spacing: 1px;
+line-height: 14px;
+text-align: center;
+text-transform: uppercase;
+}
+.as_event_date .as_day {
+display: block;
+font-size: 20px;
+line-height: 22px;
+text-align: center;
+}
+.as_day_sep {
+float: left;
+line-height: 40px;
+margin-right: 5px;
+text-align: left;
+}
