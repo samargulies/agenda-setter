@@ -1,7 +1,7 @@
 <?php
 /*
 Plugin Name: Agenda Setter
-Plugin URI: 
+Plugin URI: http://github.com/samargulies/agenda-setter
 Description: A simple wordpress event calendar
 Version: 0.1
 Author: Sam Margulies
@@ -25,15 +25,25 @@ License: Copyright 2010 Sam Margulies
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
+//set DEBUG to true to print debugging information
+define("DEBUG", TRUE);
+
+// load SCB Framework
+require dirname( __FILE__ ) . '/scb/load.php';
+
+// initiate SCB Framework and Classes
+function _as_init() {
+	AS_Query::init();
+}
+scb_init( '_as_init' );
+
+// TODO: make these part of options page
+$event_post_types = array('post', 'page');
+
 // Create meta-boxes for event date and time
 // adapted from Date Field by Matthew Haines-Young (http://matth.eu/wordpress-date-field-plugin)
 
 // an array containing arrays for each field.
-
-//set DEBUG to true to print debugging information
-define("DEBUG", FALSE);
-
-$event_post_types = array('post', 'page');
 
 $as_new_meta_boxes = array( 
 	"date" => array(
@@ -334,23 +344,17 @@ function as_get_events($display='', $args='') {
 	$defaults = array(
 		'post_type' => $event_post_types,
 		'as_event' => 'as_event_post',
-		/* 'meta_key' => '_end_date_generated_value',
-		'orderby' => 'meta_value',
-		'meta_compare' => '>=',
-		'meta_value' => time(),
-		'order' => 'ASC', */
 		'posts_per_page' => 5,
 		'as_event_date' => 'upcoming',
 		'suppress_filters' => 'false'
 	);
 	$args = wp_parse_args( $args, $defaults );	
 
-	$events_query = get_posts($args);
+	$events_query = new WP_Query($args);
  	
-	if ( $events_query ) : 
+	if ( $events_query->have_posts() ) : 
 		$content = '<ul>';
-		foreach ( $events_query as $post):
-			setup_postdata($post);
+		while ( $events_query->have_posts() ): $events_query->the_post() ;
 			switch ($display) :
 
 			case 'full' :
@@ -362,11 +366,12 @@ function as_get_events($display='', $args='') {
 				break;
 	
 			endswitch;
-		endforeach;
+		endwhile;
 		$content .= '</ul>'; 
 		
 	else:
-		// no upcoming events
+		if( DEBUG )
+			echo 'no upcoming events for this as_get_events() query';
 	endif;
 	
 	wp_reset_postdata();
@@ -512,20 +517,16 @@ class Agenda_Setter_Widget extends WP_Widget {
 	}
 }
 
+/*
 function as_query_events_taxonomy( $query ) {
-	global $as_event_date, $as_query_active;
 	
 	if( $query->get('as_event') ) {
-		$as_query_active = true;
-
+		
+		$query->set('suppress_filters', 'false');
 		// retrieve events by end date
 		$query->set('meta_key', '_end_date_generated_value');
 		$query->set('orderby', 'meta_value');
-		$query->set('suppress_filters', 'false');
-		
-		//set global $as_event_date variable to allow for conditional filtering of the query
-		$as_event_date = $query->get('as_event_date');
-		
+
 		if ( $as_event_date == 'past' ) {
 			$meta_compare = '<';
 			$order = "DESC";
@@ -536,63 +537,78 @@ function as_query_events_taxonomy( $query ) {
 		$query->set('post_type', $event_post_types);
 		$query->set('meta_compare', $meta_compare);
 		$query->set('meta_value', time());
-		$query->set('order', $order);		
+		$query->set('order', $order);
 	}
 }
 add_action('pre_get_posts', 'as_query_events_taxonomy');
+*/
 
-function as_query_finished() {
-	global $as_query_active;
-	$as_query_active = false;
-}
-add_action('posts_selection', 'as_query_finished');
+class AS_Query {
 
-function as_query_where( $where ) {
-	global $as_event_date, $wpdb;
-	if( $as_query_active ) {
-		if ( $as_event_date == 'past' ) {
-			$meta_compare = '<';
-		} else {
-			$meta_compare = '>=';
+	function init() {
+		add_filter( 'posts_where', array( __CLASS__, 'posts_where' ), 10, 2 );
+		add_filter( 'posts_join', array( __CLASS__, 'posts_join' ), 10, 2 );
+		add_filter( 'posts_groupby', array( __CLASS__, 'posts_groupby' ), 10, 2 );
+		add_filter( 'posts_orderby', array( __CLASS__, 'posts_orderby' ), 10, 2 );
+	}
+
+	function posts_where( $where, $wp_query ) {
+		global $wpdb;
+		
+		if( $wp_query->get('as_event') == 'as_event_post' ) {
+		
+			if ( $wp_query->get('as_event_date') == 'past' ) {
+				$meta_compare = '<';
+			} else {
+				$meta_compare = '>=';
+			}
+			// retrieve events by end date
+			$where .= " AND postmeta.meta_value $meta_compare " . time();
+		
 		}
-		// retrieve events by end date
-		$where = " AND {$wpdb->postmeta}.meta_key = '_end_date_generated_value' AND {$wpdb->postmeta}.meta_value $meta_compare " . time();
+		
+		return $where;
 	}
-	return $where;
-}
-add_filter('posts_where', 'as_query_where' );
-
-function as_query_join($join) {
-	global $wpdb;
-	if( $as_query_active ) {
-		$join .= " JOIN {$wpdb->postmeta} AS postmeta_start_date ON (postmeta_start_date.post_id = {$wpdb->posts}.ID AND postmeta_start_date.meta_key = '_date_value') ";
-	}
-	return $join;
-}
-add_filter('posts_join', 'as_query_join' );
-
-function as_query_groupby($group) {
-	global $wpdb;
-	if( $as_query_active ) {
-		$group .= " {$wpdb->posts}.ID ";
-	}
-	return $group;
-}	
-//add_filter('posts_groupby', 'as_query_group' );
-
-function as_query_orderby($orderby) {
-	global $as_event_date, $wpdb;
-	if( $as_query_active ) {
-		if ( $as_event_date == 'past' ) {
-			$order = 'DESC';
-		} else {
-			$order = 'ASC';
+	
+	function posts_join( $join, $wp_query ) {
+		global $wpdb;
+		if( $wp_query->get('as_event') == 'as_event_post' ) {
+			
+			$join .= " INNER JOIN {$wpdb->postmeta} AS postmeta_start_date ON ( postmeta_start_date.post_id = {$wpdb->posts}.ID AND postmeta_start_date.meta_key = '_date_value' ) INNER JOIN {$wpdb->postmeta} AS postmeta ON ( postmeta.post_id = {$wpdb->posts}.ID AND postmeta.meta_key = '_end_date_generated_value' ) ";
+		
 		}
-		$orderby = " postmeta_start_date.meta_value $order";
+		
+		return $join;
 	}
-	return $orderby;
-}	
-add_filter('posts_orderby', 'as_query_orderby' );
+	
+	
+	function posts_groupby( $group, $wp_query ) {
+		global $wpdb;
+		if( $wp_query->get('as_event') == 'as_event_post' ) {
+			$group = " {$wpdb->posts}.ID ";
+		}
+		return $group;
+	}	
+	
+	
+	function posts_orderby( $orderby, $wp_query ) {
+		global $as_event_date, $wpdb;
+		
+		if( $wp_query->get('as_event') == 'as_event_post' ) {
+			
+			if ( $wp_query->get('as_event_date') == 'past' ) {
+				$order = 'DESC';
+			} else {
+				$order = 'ASC';
+			}
+			
+			$orderby = " postmeta_start_date.meta_value $order";
+		
+		}
+		
+		return $orderby;
+	}	
+}
 
 // let wordpress know about custom query vars
 function as_query_vars( $query_vars ) {
