@@ -1,21 +1,18 @@
-h1. Agenda Setter
+# Agenda Setter
 
 Easily create and display a daily calendar of events tied to other post types and taxonomies.
 
-h2. Description
+## Installation
 
-Easily create and display a daily calendar of events tied to other post types and taxonomies
+1. Upload `agenda-setter/` to the `/wp-content/plugins/` directory
+2. Activate the plugin through the 'Plugins' menu in WordPress
 
-h2. Installation
+## Frequently Asked Questions
 
-# Upload `agenda-setter/` to the `/wp-content/plugins/` directory
-# Activate the plugin through the 'Plugins' menu in WordPress
+## Screenshots
 
-h2. Frequently Asked Questions
+## Changelog
 
-h2. Screenshots
+### 0.1
 
-h2. Changelog
-
-h3. 0.1
 * First Edition
